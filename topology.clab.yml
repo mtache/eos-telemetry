@@ -1,0 +1,61 @@
+name: ceos-telemetry
+
+mgmt:
+  #external-access: false
+  network: ceos-telemetry-devices
+  # Containerlab defaults the management network to be 172.20.20.0/24. Arista uses 172.20 address space.
+  ipv4_subnet: 10.0.42.0/24
+
+topology:
+  kinds:
+    ceos:
+      image: ceos:4.28.3M
+      startup-config: startup-config
+      env:
+        INTFTYPE: et
+  nodes:
+    # Host ports = [3 digits node port][0=spine 1=leaf 2=host][id]
+    spine1:
+      kind: ceos
+      ports:
+        - 22001:22/tcp
+        - 44301:443/tcp
+    spine2:
+      kind: ceos
+      ports:
+        - 22002:22/tcp
+        - 44302:443/tcp
+    leaf1:
+      kind: ceos
+      ports:
+        - 22011:22/tcp
+        - 44311:443/tcp
+    leaf2:
+      kind: ceos
+      ports:
+        - 22012:22/tcp
+        - 44312:443/tcp
+    leaf3:
+      kind: ceos
+      ports:
+        - 22013:22/tcp
+        - 44313:443/tcp
+    leaf4:
+      kind: ceos
+      ports:
+        - 22014:22/tcp
+        - 44314:443/tcp
+
+  links:
+    - endpoints: ["spine1:et1", "leaf1:et1"]
+    - endpoints: ["spine1:et2", "leaf2:et1"]
+    - endpoints: ["spine1:et3", "leaf3:et1"]
+    - endpoints: ["spine1:et4", "leaf4:et1"]
+    - endpoints: ["spine2:et1", "leaf1:et2"]
+    - endpoints: ["spine2:et2", "leaf2:et2"]
+    - endpoints: ["spine2:et3", "leaf3:et2"]
+    - endpoints: ["spine2:et4", "leaf4:et2"]
+    - endpoints: ["leaf1:et3", "leaf2:et3"]
+    - endpoints: ["leaf1:et4", "leaf2:et4"]
+    - endpoints: ["leaf3:et3", "leaf4:et3"]
+    - endpoints: ["leaf3:et4", "leaf4:et4"]
