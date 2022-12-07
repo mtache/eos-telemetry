@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -46,21 +46,24 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 70,
-            "gradientMode": "opacity",
+            "fillOpacity": 20,
+            "gradientMode": "hue",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
             "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": true,
+            "spanNulls": 3600000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -134,7 +137,7 @@
           "measurement": "cpu",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "import \"strings\"\nfrom(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"kernel_cpu\" and  r._field =~ /cpu\\/\\d\\/util$/ and r.source == \"${device}\")\n  |> fill(usePrevious: true)\n  |> map(fn: (r) => ({ r with _field: \"Core \" + strings.split(v: r._field, t: \"/\")[1] }))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> yield()\n",
+          "query": "import \"strings\"\nfrom(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"kernel_cpu\" and  r._field =~ /cpu\\/\\d\\/util$/ and r.source == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> map(fn: (r) => ({ r with _field: \"Core \" + strings.split(v: r._field, t: \"/\")[1] }))\n  |> yield()\n",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -162,23 +165,22 @@
         "type": "influxdb",
         "uid": "PF6CD3C7EE64CF7D1"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "rgb(29, 207, 8)",
-                "value": null
-              },
-              {
-                "color": "rgb(181, 21, 36)",
-                "value": 80
-              }
-            ]
+          "color": {
+            "mode": "palette-classic"
           },
-          "unit": "decbytes"
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 4,
+          "mappings": [],
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -190,16 +192,23 @@
       },
       "id": 14,
       "options": {
-        "orientation": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "pieType": "pie",
         "reduceOptions": {
           "calcs": [
-            "mean"
+            "lastNotNull"
           ],
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "9.2.4",
       "targets": [
@@ -208,12 +217,13 @@
             "type": "influxdb",
             "uid": "PF6CD3C7EE64CF7D1"
           },
-          "query": "import \"experimental\"\nimport \"influxdata/influxdb/schema\"\ntotalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"memTotal\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memFree\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> map(fn: (r) => ({ r with _value: totalRam._value - r._value}))\n  |> map(fn: (r) => if r._field == \"memFree\" then {r with _field: \"Used RAM\"}\n               else {r with _field: r._field})\n  |> yield()",
+          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"memTotal\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and (r[\"_field\"] == \"memFree\" or r[\"_field\"] == \"memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r.memAvailable }) )\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"memFree\" then {r with _field: \"Free Memory\"}\n               else if r._field == \"memAvailable\" then {r with _field: \"Available Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"host\", \"path\", \"source\"])\n  |> yield()",
           "refId": "A"
         }
       ],
-      "title": "Memory Usage",
-      "type": "gauge"
+      "title": "Memory Utilization",
+      "transformations": [],
+      "type": "piechart"
     },
     {
       "datasource": {
@@ -247,7 +257,7 @@
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": false,
+            "spanNulls": 3600000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -302,7 +312,7 @@
             "type": "influxdb",
             "uid": "PF6CD3C7EE64CF7D1"
           },
-          "query": "from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"openconfig_ifcounters\" and (r[\"_field\"] == \"in_octets\" or r[\"_field\"] == \"out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> yield(name: \"derivative\")",
+          "query": "from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"openconfig_ifcounters\" and (r[\"_field\"] == \"in_octets\" or r[\"_field\"] == \"out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: 10s, fn: last, createEmpty: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => if r._field == \"in_octets\" then {r with _field: \"Ingress datarate\"}\n               else if r._field == \"out_octets\" then {r with _field: \"Egress datarate\"}\n               else {r with _field: r._field})\n  |> yield()",
           "refId": "A"
         }
       ],
@@ -339,8 +349,8 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "never",
-            "spanNulls": false,
+            "showPoints": "auto",
+            "spanNulls": 3600000,
             "stacking": {
               "group": "A",
               "mode": "normal"
@@ -365,7 +375,7 @@
               }
             ]
           },
-          "unit": "deckbytes"
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -395,15 +405,25 @@
             "type": "influxdb",
             "uid": "PF6CD3C7EE64CF7D1"
           },
-          "query": "import \"experimental\"\nimport \"influxdata/influxdb/schema\"\ntotalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_sysinfo\" and r[\"_field\"] == \"totalram\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"totalram\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_sysinfo\" and (r[\"_field\"] == \"bufferram\" or r[\"_field\"] == \"freeram\" or r[\"_field\"] == \"sharedram\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Unallocated RAM\": totalRam._value - (r.bufferram + r. freeram + r.sharedram) }))\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"freeram\" then {r with _field: \"Free RAM\"}\n               else if r._field == \"bufferram\" then {r with _field: \"Buffer RAM\"}\n               else if r._field == \"sharedram\" then {r with _field: \"Shared RAM\"}\n               else {r with _field: r._field})\n  |> yield()",
+          "hide": true,
+          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"memTotal\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and (r[\"_field\"] == \"memFree\" or r[\"_field\"] == \"memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r.memAvailable }) )\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"memFree\" then {r with _field: \"Free Memory\"}\n               else if r._field == \"memAvailable\" then {r with _field: \"Available Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"host\", \"path\", \"source\"])\n  |> yield()",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF6CD3C7EE64CF7D1"
+          },
+          "hide": false,
+          "query": "totalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"memTotal\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and (r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> map(fn: (r) => if not exists r._value then {r with _value: totalRam._value} else r)\n  |> yield()",
+          "refId": "B"
         }
       ],
       "title": "Memory Allocation",
       "type": "timeseries"
     }
   ],
-  "refresh": "10s",
+  "refresh": "",
   "schemaVersion": 37,
   "style": "dark",
   "tags": [
@@ -413,9 +433,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "clab-ceos-telemetry-leaf1",
-          "value": "clab-ceos-telemetry-leaf1"
+          "selected": false,
+          "text": "clab-ceos-telemetry-leaf3",
+          "value": "clab-ceos-telemetry-leaf3"
         },
         "datasource": {
           "type": "influxdb",
@@ -428,7 +448,7 @@
         "name": "device",
         "options": [],
         "query": "SHOW TAG VALUES WITH KEY=\"source\"",
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
@@ -439,22 +459,22 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": "Ethernet1",
-          "value": "Ethernet1"
+          "selected": false,
+          "text": "Management0",
+          "value": "Management0"
         },
         "datasource": {
           "type": "influxdb",
           "uid": "P951FEA4DE68E13C5"
         },
-        "definition": "SHOW TAG VALUES FROM \"openconfig_ifcounters\" WITH KEY=\"name\" WHERE \"source\"=${device}",
+        "definition": "SHOW TAG VALUES FROM \"openconfig_ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "interface",
         "options": [],
-        "query": "SHOW TAG VALUES FROM \"openconfig_ifcounters\" WITH KEY=\"name\" WHERE \"source\"=${device}",
-        "refresh": 1,
+        "query": "SHOW TAG VALUES FROM \"openconfig_ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
@@ -482,6 +502,6 @@
   "timezone": "",
   "title": "Device Health",
   "uid": "ky1bhqdMz",
-  "version": 19,
+  "version": 13,
   "weekStart": ""
 }
