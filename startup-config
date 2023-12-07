@@ -3,6 +3,5 @@ username admin secret admin privilege 15 role network-admin
 management api gnmi
    transport grpc default
    !
-   transport grpc management
    provider eos-native
 !
