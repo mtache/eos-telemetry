@@ -10,14 +10,14 @@ datasources:
     jsonData:
       version: Flux
       organization: arista
-      defaultBucket: my-network
+      defaultBucket: eos-telemetry
 
   - name: InfluxDB
     type: influxdb
     access: proxy
     url: http://influxdb:8086
     # This database should be mapped to a bucket
-    database: my-network
+    database: eos-telemetry
     jsonData:
       httpMode: GET
       httpHeaderName1: 'Authorization'

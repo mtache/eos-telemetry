@@ -1,16 +1,19 @@
-version: '3.7'
+version: '3.8'
 
 volumes:
   influx_data:
+    driver: local
+  influx_config:
     driver: local
   grafana_data:
     driver: local
 
 services:
   influxdb:
-    image: influxdb:2.5
+    image: influxdb:2.7
     volumes:
       - influx_data:/var/lib/influxdb2
+      - influx_config:/etc/influxdb2
       - ./influxdb/scripts:/docker-entrypoint-initdb.d
     ports:
       - 8086:8086
@@ -22,6 +25,7 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=arista
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=arista123
       - DOCKER_INFLUXDB_INIT_BUCKET=default
+      - DOCKER_INFLUXDB_INIT_RETENTION=14d
     healthcheck:
       test: ["CMD", "influx", "ping"]
       interval: 30s
@@ -42,9 +46,9 @@ services:
       - ./telegraf:/etc/telegraf
     depends_on:
       - influxdb
-    # networks:
-    #   - default
-    #   - devices
+    networks:
+      - default
+      - devices
 
   grafana:
     image: grafana/grafana
@@ -59,9 +63,9 @@ services:
       - grafana
 
 networks:
-  # devices:
-  #   name: ceos-telemetry-devices
-  #   external: true
+  devices:
+    name: ceos-telemetry-devices
+    external: true
   grafana:
     name: grafana
     driver: bridge

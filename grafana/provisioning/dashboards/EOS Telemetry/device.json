@@ -40,6 +40,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "CPU Utilization",
@@ -53,6 +54,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineStyle": {
               "fill": "solid"
@@ -137,7 +139,7 @@
           "measurement": "cpu",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "import \"strings\"\nfrom(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"kernel_cpu\" and  r._field =~ /cpu\\/\\d\\/util$/ and r.source == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> map(fn: (r) => ({ r with _field: \"Core \" + strings.split(v: r._field, t: \"/\")[1] }))\n  |> yield()\n",
+          "query": "import \"strings\"\nfrom(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"cpu\" and r._field =~ /cpu\\/\\d\\/util$/  and r.source == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> map(fn: (r) => ({ r with _field: \"Core \" + strings.split(v: r._field, t: \"/\")[5] }))\n  |> yield()\n",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -203,6 +205,8 @@
       },
       "id": 15,
       "options": {
+        "minVizHeight": 200,
+        "minVizWidth": 200,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -213,9 +217,10 @@
         },
         "showThresholdLabels": true,
         "showThresholdMarkers": true,
+        "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "9.3.1",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
@@ -223,7 +228,7 @@
             "uid": "PF6CD3C7EE64CF7D1"
           },
           "hide": false,
-          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"memTotal\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memAvailable\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Total Memory\": totalRam._value }) )\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r.memAvailable }) )\n  |> drop(columns: [\"memAvailable\"])\n  |> experimental.unpivot()\n  |> drop(columns: [\"host\", \"path\", \"source\"])\n  |> yield()",
+          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Total Memory\": totalRam._value }) )\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> drop(columns: [\"host\", \"path\", \"source\"])\n  |> yield()",
           "refId": "A"
         }
       ],
@@ -288,7 +293,7 @@
             "type": "influxdb",
             "uid": "PF6CD3C7EE64CF7D1"
           },
-          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"my-network\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and r[\"_field\"] == \"memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"memTotal\", idx: 0)\n\nramUsage = from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and (r[\"_field\"] == \"memFree\" or r[\"_field\"] == \"memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r.memAvailable }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r.memAvailable - r.memFree }) )\n  |> drop(columns: [\"memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"host\", \"path\", \"source\"])\n  |> yield()",
+          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and (r[\"_field\"] == \"Kernel/proc/meminfo/memFree\" or r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r[\"Kernel/proc/meminfo/memAvailable\"] - r[\"Kernel/proc/meminfo/memFree\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"Kernel/proc/meminfo/memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"path\", \"source\"])\n  |> yield()",
           "refId": "A"
         }
       ],
@@ -299,7 +304,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "PF6CD3C7EE64CF7D1"
+        "uid": "P951FEA4DE68E13C5"
       },
       "description": "",
       "fieldConfig": {
@@ -308,6 +313,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -321,6 +327,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -337,7 +344,6 @@
               "mode": "off"
             }
           },
-          "displayName": "${__field.name}",
           "links": [],
           "mappings": [],
           "thresholds": {
@@ -363,7 +369,7 @@
         "x": 0,
         "y": 8
       },
-      "id": 8,
+      "id": 16,
       "options": {
         "legend": {
           "calcs": [],
@@ -379,12 +385,125 @@
       "pluginVersion": "9.2.4",
       "targets": [
         {
+          "alias": "Ingress datarate",
           "datasource": {
             "type": "influxdb",
-            "uid": "PF6CD3C7EE64CF7D1"
+            "uid": "P951FEA4DE68E13C5"
           },
-          "query": "from(bucket: \"my-network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"openconfig_ifcounters\" and (r[\"_field\"] == \"in_octets\" or r[\"_field\"] == \"out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: 10s, fn: last, createEmpty: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => if r._field == \"in_octets\" then {r with _field: \"Ingress datarate\"}\n               else if r._field == \"out_octets\" then {r with _field: \"Egress datarate\"}\n               else {r with _field: r._field})\n  |> yield()",
-          "refId": "A"
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "ifcounters",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ifcounters\" and (r[\"_field\"] == \"interfaces/interface/state/counters/in_octets\" or r[\"_field\"] == \"interfaces/interface/state/counters/out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: 10s, fn: last, createEmpty: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => if r._field == \"interfaces/interface/state/counters/in_octets\" then {r with _field: \"Ingress datarate\"}\n               else if r._field == \"interfaces/interface/state/counters/out_octets\" then {r with _field: \"Egress datarate\"}\n               else {r with _field: r._field})\n  |> yield()",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "interfaces/interface/state/counters/in_octets"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": [
+                  "1s"
+                ],
+                "type": "derivative"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            },
+            {
+              "condition": "AND",
+              "key": "name::tag",
+              "operator": "=~",
+              "value": "/^$interface$/"
+            }
+          ]
+        },
+        {
+          "alias": "Egress datarate",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P951FEA4DE68E13C5"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "hide": false,
+          "measurement": "ifcounters",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ifcounters\" and (r[\"_field\"] == \"interfaces/interface/state/counters/in_octets\" or r[\"_field\"] == \"interfaces/interface/state/counters/out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: 10s, fn: last, createEmpty: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => if r._field == \"interfaces/interface/state/counters/in_octets\" then {r with _field: \"Ingress datarate\"}\n               else if r._field == \"interfaces/interface/state/counters/out_octets\" then {r with _field: \"Egress datarate\"}\n               else {r with _field: r._field})\n  |> yield()",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "interfaces/interface/state/counters/out_octets"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": [
+                  "1s"
+                ],
+                "type": "derivative"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            },
+            {
+              "condition": "AND",
+              "key": "name::tag",
+              "operator": "=~",
+              "value": "/^$interface$/"
+            }
+          ]
         }
       ],
       "title": "Bitrate In/Out of ${interface}",
@@ -392,8 +511,7 @@
     }
   ],
   "refresh": "10s",
-  "schemaVersion": 37,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [
     "Arista"
   ],
@@ -402,8 +520,8 @@
       {
         "current": {
           "selected": false,
-          "text": "clab-ceos-telemetry-leaf1",
-          "value": "clab-ceos-telemetry-leaf1"
+          "text": "ld365",
+          "value": "ld365"
         },
         "datasource": {
           "type": "influxdb",
@@ -428,20 +546,20 @@
       {
         "current": {
           "selected": false,
-          "text": "Management0",
-          "value": "Management0"
+          "text": "Ethernet4/1",
+          "value": "Ethernet4/1"
         },
         "datasource": {
           "type": "influxdb",
           "uid": "P951FEA4DE68E13C5"
         },
-        "definition": "SHOW TAG VALUES FROM \"openconfig_ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
+        "definition": "SHOW TAG VALUES FROM \"ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "interface",
         "options": [],
-        "query": "SHOW TAG VALUES FROM \"openconfig_ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
+        "query": "SHOW TAG VALUES FROM \"ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -470,6 +588,6 @@
   "timezone": "",
   "title": "Device Health",
   "uid": "ky1bhqdMz",
-  "version": 4,
+  "version": 3,
   "weekStart": ""
 }

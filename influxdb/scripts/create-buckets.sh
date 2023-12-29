@@ -1,4 +1,4 @@
 #!/bin/sh
 
-influx bucket create -n influxdb -o arista
-influx bucket create -n my-network -o arista
+influx bucket create --name influxdb --org arista --retention 14d
+influx bucket create --name eos-telemetry --org arista --retention 14d
