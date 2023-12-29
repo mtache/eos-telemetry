@@ -293,7 +293,7 @@
             "type": "influxdb",
             "uid": "PF6CD3C7EE64CF7D1"
           },
-          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"kernel_memory\" and (r[\"_field\"] == \"Kernel/proc/meminfo/memFree\" or r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r[\"Kernel/proc/meminfo/memAvailable\"] - r[\"Kernel/proc/meminfo/memFree\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"Kernel/proc/meminfo/memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"path\", \"source\"])\n  |> yield()",
+          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and (r[\"_field\"] == \"Kernel/proc/meminfo/memFree\" or r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r[\"Kernel/proc/meminfo/memAvailable\"] - r[\"Kernel/proc/meminfo/memFree\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"Kernel/proc/meminfo/memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"path\", \"source\"])\n  |> yield()",
           "refId": "A"
         }
       ],
@@ -589,6 +589,6 @@
   "timezone": "",
   "title": "Device Health",
   "uid": "ky1bhqdMz",
-  "version": 6,
+  "version": 8,
   "weekStart": ""
 }
