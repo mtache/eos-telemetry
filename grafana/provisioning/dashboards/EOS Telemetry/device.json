@@ -370,6 +370,7 @@
         "y": 8
       },
       "id": 16,
+      "interval": "10s",
       "options": {
         "legend": {
           "calcs": [],
@@ -520,8 +521,8 @@
       {
         "current": {
           "selected": false,
-          "text": "ld365",
-          "value": "ld365"
+          "text": "brw552",
+          "value": "brw552"
         },
         "datasource": {
           "type": "influxdb",
@@ -546,8 +547,8 @@
       {
         "current": {
           "selected": false,
-          "text": "Ethernet4/1",
-          "value": "Ethernet4/1"
+          "text": "Ethernet1/1",
+          "value": "Ethernet1/1"
         },
         "datasource": {
           "type": "influxdb",
@@ -588,6 +589,6 @@
   "timezone": "",
   "title": "Device Health",
   "uid": "ky1bhqdMz",
-  "version": 3,
+  "version": 6,
   "weekStart": ""
 }

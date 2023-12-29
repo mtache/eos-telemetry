@@ -10,7 +10,7 @@ volumes:
 
 services:
   influxdb:
-    image: influxdb:2.7
+    image: influxdb:2.5
     volumes:
       - influx_data:/var/lib/influxdb2
       - influx_config:/etc/influxdb2
