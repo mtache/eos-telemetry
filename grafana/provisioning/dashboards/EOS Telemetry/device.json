@@ -239,71 +239,6 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "PF6CD3C7EE64CF7D1"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "decimals": 4,
-          "mappings": [],
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 17,
-        "y": 0
-      },
-      "id": 14,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "9.2.4",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "PF6CD3C7EE64CF7D1"
-          },
-          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and (r[\"_field\"] == \"Kernel/proc/meminfo/memFree\" or r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r[\"Kernel/proc/meminfo/memAvailable\"] - r[\"Kernel/proc/meminfo/memFree\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"Kernel/proc/meminfo/memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"path\", \"source\"])\n  |> yield()",
-          "refId": "A"
-        }
-      ],
-      "title": "Memory Allocation",
-      "transformations": [],
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
         "uid": "P951FEA4DE68E13C5"
       },
       "description": "",
@@ -509,6 +444,71 @@
       ],
       "title": "Bitrate In/Out of ${interface}",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF6CD3C7EE64CF7D1"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 4,
+          "mappings": [],
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 8
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF6CD3C7EE64CF7D1"
+          },
+          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and (r[\"_field\"] == \"Kernel/proc/meminfo/memFree\" or r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r[\"Kernel/proc/meminfo/memAvailable\"] - r[\"Kernel/proc/meminfo/memFree\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"Kernel/proc/meminfo/memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"path\", \"source\"])\n  |> yield()",
+          "refId": "A"
+        }
+      ],
+      "title": "Memory Allocation",
+      "transformations": [],
+      "type": "piechart"
     }
   ],
   "refresh": "10s",
@@ -521,8 +521,8 @@
       {
         "current": {
           "selected": false,
-          "text": "brw552",
-          "value": "brw552"
+          "text": "ld365",
+          "value": "ld365"
         },
         "datasource": {
           "type": "influxdb",
@@ -547,8 +547,8 @@
       {
         "current": {
           "selected": false,
-          "text": "Ethernet1/1",
-          "value": "Ethernet1/1"
+          "text": "Ethernet10/1",
+          "value": "Ethernet10/1"
         },
         "datasource": {
           "type": "influxdb",
@@ -589,6 +589,6 @@
   "timezone": "",
   "title": "Device Health",
   "uid": "ky1bhqdMz",
-  "version": 8,
+  "version": 10,
   "weekStart": ""
 }

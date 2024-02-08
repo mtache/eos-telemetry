@@ -10,7 +10,7 @@ volumes:
 
 services:
   influxdb:
-    image: influxdb:2.5
+    image: influxdb:2.7
     volumes:
       - influx_data:/var/lib/influxdb2
       - influx_config:/etc/influxdb2
@@ -18,7 +18,7 @@ services:
     ports:
       - 8086:8086
     environment:
-      - TZ=Europe/Paris
+      - TZ=Etc/UTC
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
       - DOCKER_INFLUXDB_INIT_PASSWORD=arista123
@@ -26,6 +26,7 @@ services:
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=arista123
       - DOCKER_INFLUXDB_INIT_BUCKET=default
       - DOCKER_INFLUXDB_INIT_RETENTION=14d
+      #- INFLUXD_LOG_LEVEL=debug
     healthcheck:
       test: ["CMD", "influx", "ping"]
       interval: 30s
