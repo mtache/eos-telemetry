@@ -26,12 +26,11 @@
   "graphTooltip": 0,
   "id": 2,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "PF6CD3C7EE64CF7D1"
+        "uid": "P483D683DA2DCC7C7"
       },
       "description": "",
       "fieldConfig": {
@@ -46,6 +45,7 @@
             "axisLabel": "CPU Utilization",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "hue",
@@ -55,7 +55,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineStyle": {
               "fill": "solid"
             },
@@ -64,7 +64,8 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "never",
+            "showPoints": "always",
+            "showValues": false,
             "spanNulls": 3600000,
             "stacking": {
               "group": "A",
@@ -82,7 +83,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -111,16 +112,17 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "12.2.0",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "PF6CD3C7EE64CF7D1"
+            "uid": "P483D683DA2DCC7C7"
           },
           "groupBy": [
             {
@@ -128,6 +130,12 @@
                 "$__interval"
               ],
               "type": "time"
+            },
+            {
+              "params": [
+                "source::tag"
+              ],
+              "type": "tag"
             },
             {
               "params": [
@@ -139,14 +147,13 @@
           "measurement": "cpu",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "import \"strings\"\nfrom(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"cpu\" and r._field =~ /cpu\\/\\d\\/util$/  and r.source == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> map(fn: (r) => ({ r with _field: \"Core \" + strings.split(v: r._field, t: \"/\")[5] }))\n  |> yield()\n",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
             [
               {
                 "params": [
-                  "value"
+                  "Kernel/proc/cpu/utilization/total/util"
                 ],
                 "type": "field"
               },
@@ -156,7 +163,13 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            }
+          ]
         }
       ],
       "title": "CPU Utilization",
@@ -165,7 +178,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "PF6CD3C7EE64CF7D1"
+        "uid": "P483D683DA2DCC7C7"
       },
       "description": "",
       "fieldConfig": {
@@ -181,7 +194,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "semi-dark-orange",
@@ -220,26 +233,62 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "10.2.3",
+      "pluginVersion": "12.2.0",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "PF6CD3C7EE64CF7D1"
+            "uid": "P483D683DA2DCC7C7"
           },
-          "hide": false,
-          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Total Memory\": totalRam._value }) )\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> drop(columns: [\"host\", \"path\", \"source\"])\n  |> yield()",
-          "refId": "A"
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "memory",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            }
+          ]
         }
       ],
       "title": "Memory Utilization",
-      "transformations": [],
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "P951FEA4DE68E13C5"
+        "uid": "P483D683DA2DCC7C7"
       },
       "description": "",
       "fieldConfig": {
@@ -254,6 +303,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
@@ -263,13 +313,14 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepBefore",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": 3600000,
             "stacking": {
               "group": "A",
@@ -286,7 +337,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -294,13 +345,13 @@
               }
             ]
           },
-          "unit": "Bps"
+          "unit": "bps"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 19,
+        "w": 17,
         "x": 0,
         "y": 8
       },
@@ -314,17 +365,18 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "12.2.0",
       "targets": [
         {
-          "alias": "Ingress datarate",
+          "alias": "$tag_name",
           "datasource": {
             "type": "influxdb",
-            "uid": "P951FEA4DE68E13C5"
+            "uid": "P483D683DA2DCC7C7"
           },
           "groupBy": [
             {
@@ -335,15 +387,26 @@
             },
             {
               "params": [
-                "null"
+                "name::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "source::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "none"
               ],
               "type": "fill"
             }
           ],
-          "measurement": "ifcounters",
+          "measurement": "interfaces-counters",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ifcounters\" and (r[\"_field\"] == \"interfaces/interface/state/counters/in_octets\" or r[\"_field\"] == \"interfaces/interface/state/counters/out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: 10s, fn: last, createEmpty: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => if r._field == \"interfaces/interface/state/counters/in_octets\" then {r with _field: \"Ingress datarate\"}\n               else if r._field == \"interfaces/interface/state/counters/out_octets\" then {r with _field: \"Egress datarate\"}\n               else {r with _field: r._field})\n  |> yield()",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -356,74 +419,19 @@
               },
               {
                 "params": [],
-                "type": "last"
+                "type": "max"
               },
               {
                 "params": [
                   "1s"
                 ],
-                "type": "derivative"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "source::tag",
-              "operator": "=~",
-              "value": "/^$device$/"
-            },
-            {
-              "condition": "AND",
-              "key": "name::tag",
-              "operator": "=~",
-              "value": "/^$interface$/"
-            }
-          ]
-        },
-        {
-          "alias": "Egress datarate",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P951FEA4DE68E13C5"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "hide": false,
-          "measurement": "ifcounters",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "query": "from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ifcounters\" and (r[\"_field\"] == \"interfaces/interface/state/counters/in_octets\" or r[\"_field\"] == \"interfaces/interface/state/counters/out_octets\") and r[\"name\"] == \"${interface}\" and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: 10s, fn: last, createEmpty: true)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => if r._field == \"interfaces/interface/state/counters/in_octets\" then {r with _field: \"Ingress datarate\"}\n               else if r._field == \"interfaces/interface/state/counters/out_octets\" then {r with _field: \"Egress datarate\"}\n               else {r with _field: r._field})\n  |> yield()",
-          "refId": "B",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "interfaces/interface/state/counters/out_octets"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
+                "type": "non_negative_derivative"
               },
               {
                 "params": [
-                  "1s"
+                  "*8"
                 ],
-                "type": "derivative"
+                "type": "math"
               }
             ]
           ],
@@ -448,7 +456,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "PF6CD3C7EE64CF7D1"
+        "uid": "P483D683DA2DCC7C7"
       },
       "description": "",
       "fieldConfig": {
@@ -457,14 +465,54 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "decimals": 4,
           "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
           "unit": "bytes"
         },
         "overrides": []
@@ -472,99 +520,268 @@
       "gridPos": {
         "h": 8,
         "w": 6,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 27
       },
       "id": 14,
       "options": {
         "legend": {
+          "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "12.2.0",
       "targets": [
         {
+          "alias": "Total",
           "datasource": {
             "type": "influxdb",
-            "uid": "PF6CD3C7EE64CF7D1"
+            "uid": "P483D683DA2DCC7C7"
           },
-          "query": "import \"influxdata/influxdb/schema\"\nimport \"experimental\"\n\ntotalRam = from(bucket: \"eos-telemetry\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and r[\"_field\"] == \"Kernel/proc/meminfo/memTotal\" and r[\"source\"] == \"${device}\")\n  |> last()\n  |> findRecord(fn: (key) => key._field == \"Kernel/proc/meminfo/memTotal\", idx: 0)\n\nramUsage = from(bucket: \"eos-telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"memory\" and (r[\"_field\"] == \"Kernel/proc/meminfo/memFree\" or r[\"_field\"] == \"Kernel/proc/meminfo/memAvailable\") and r[\"source\"] == \"${device}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\n  |> fill(column: \"_value\", usePrevious: true)\n  |> schema.fieldsAsCols()\n  |> map(fn: (r) => ({ r with \"Used Memory\": totalRam._value - r[\"Kernel/proc/meminfo/memAvailable\"] }) )\n  |> map(fn: (r) => ({ r with \"Reclaimable Memory\": r[\"Kernel/proc/meminfo/memAvailable\"] - r[\"Kernel/proc/meminfo/memFree\"] }) )\n  |> drop(columns: [\"Kernel/proc/meminfo/memAvailable\"])\n  |> experimental.unpivot()\n  |> map(fn: (r) => if r._field == \"Kernel/proc/meminfo/memFree\" then {r with _field: \"Free Memory\"}\n               else {r with _field: r._field})\n  |> drop(columns: [\"path\", \"source\"])\n  |> yield()",
-          "refId": "A"
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "hide": true,
+          "measurement": "memory",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT last(\"Kernel/proc/meminfo/memTotal\") FROM \"memory\" WHERE  (\"source\"=~ /^$device$/)",
+          "rawQuery": true,
+          "refId": "Total",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "Kernel/proc/meminfo/memTotal"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            }
+          ]
+        },
+        {
+          "alias": "Free",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P483D683DA2DCC7C7"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "previous"
+              ],
+              "type": "fill"
+            }
+          ],
+          "hide": false,
+          "measurement": "memory",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT last(\"Kernel/proc/meminfo/memFree\") FROM \"memory\" WHERE (\"source\"::tag =~ /^$device$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
+          "rawQuery": false,
+          "refId": "Free",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "Kernel/proc/meminfo/memFree"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            }
+          ]
+        },
+        {
+          "alias": "Buffers",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P483D683DA2DCC7C7"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "none"
+              ],
+              "type": "fill"
+            }
+          ],
+          "hide": false,
+          "measurement": "memory",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "Kernel/proc/meminfo/buffers"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "source::tag",
+              "operator": "=~",
+              "value": "/^$device$/"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "name": "Expression",
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "downsampler": "max",
+          "expression": "Total",
+          "hide": false,
+          "refId": "Resample",
+          "type": "resample",
+          "upsampler": "pad",
+          "window": "50ms"
         }
       ],
       "title": "Memory Allocation",
-      "transformations": [],
-      "type": "piechart"
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Used",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Resample {__name__=\"Total\"}"
+                }
+              },
+              "operator": "-",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Free"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "replaceFields": false
+          }
+        }
+      ],
+      "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "10s",
-  "schemaVersion": 39,
+  "schemaVersion": 42,
   "tags": [
     "Arista"
   ],
   "templating": {
     "list": [
       {
+        "allowCustomValue": false,
         "current": {
-          "selected": false,
           "text": "ld365",
           "value": "ld365"
         },
         "datasource": {
           "type": "influxdb",
-          "uid": "P951FEA4DE68E13C5"
+          "uid": "P483D683DA2DCC7C7"
         },
         "definition": "SHOW TAG VALUES WITH KEY=\"source\"",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "device",
         "options": [],
         "query": "SHOW TAG VALUES WITH KEY=\"source\"",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "type": "query"
       },
       {
+        "allowCustomValue": false,
         "current": {
-          "selected": false,
           "text": "Ethernet10/1",
           "value": "Ethernet10/1"
         },
         "datasource": {
           "type": "influxdb",
-          "uid": "P951FEA4DE68E13C5"
+          "uid": "P483D683DA2DCC7C7"
         },
-        "definition": "SHOW TAG VALUES FROM \"ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
-        "hide": 0,
-        "includeAll": false,
-        "multi": false,
+        "definition": "SHOW TAG VALUES FROM \"interfaces-counters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
+        "includeAll": true,
+        "multi": true,
         "name": "interface",
         "options": [],
-        "query": "SHOW TAG VALUES FROM \"ifcounters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
+        "query": {
+          "query": "SHOW TAG VALUES FROM \"interfaces-counters\" WITH KEY=\"name\" WHERE \"source\"='${device}'",
+          "refId": "InfluxVariableQueryEditor-VariableQuery"
+        },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -589,6 +806,5 @@
   "timezone": "",
   "title": "Device Health",
   "uid": "ky1bhqdMz",
-  "version": 10,
-  "weekStart": ""
+  "version": 2
 }
