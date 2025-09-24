@@ -1,25 +1,24 @@
 apiVersion: 1
 
 datasources:
-  - name: InfluxDB (Flux)
+  - name: InfluxDB (SQL)
     type: influxdb
     access: proxy
-    url: http://influxdb:8086
+    url: http://influxdb:8181
     secureJsonData:
-      token: arista123
+      token: apiv3_arista_admin_token
     jsonData:
-      version: Flux
-      organization: arista
-      defaultBucket: eos-telemetry
+      dbName: default
+      insecureGrpc: true
+      version: SQL
 
-  - name: InfluxDB
+  - name: InfluxDB (InfluxQL)
     type: influxdb
     access: proxy
-    url: http://influxdb:8086
-    # This database should be mapped to a bucket
-    database: eos-telemetry
+    url: http://influxdb:8181
+    database: default
     jsonData:
       httpMode: GET
       httpHeaderName1: 'Authorization'
     secureJsonData:
-      httpHeaderValue1: 'Token arista123'
+      httpHeaderValue1: 'Token apiv3_arista_admin_token'

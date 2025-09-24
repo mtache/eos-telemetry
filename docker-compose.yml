@@ -1,72 +1,63 @@
-version: '3.8'
-
 volumes:
   influx_data:
-    driver: local
-  influx_config:
-    driver: local
+    external: true
   grafana_data:
     driver: local
 
 services:
   influxdb:
-    image: influxdb:2.7
-    volumes:
-      - influx_data:/var/lib/influxdb2
-      - influx_config:/etc/influxdb2
-      - ./influxdb/scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    image: influxdb:3-core
     ports:
-      - 8086:8086
+      - 8181:8181
     environment:
-      - TZ=Etc/UTC
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=arista123
-      - DOCKER_INFLUXDB_INIT_ORG=arista
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=arista123
-      - DOCKER_INFLUXDB_INIT_BUCKET=default
-      - DOCKER_INFLUXDB_INIT_RETENTION=14d
-      #- INFLUXD_LOG_LEVEL=debug
+      - INFLUXDB3_NODE_IDENTIFIER_PREFIX=node0
+      - LOG_FILTER=info
+      - INFLUXDB3_OBJECT_STORE=file
+      - INFLUXDB3_DB_DIR=/var/lib/influxdb3/data
+      - INFLUXDB3_ADMIN_TOKEN_FILE=/admin-token.json
     healthcheck:
-      test: ["CMD", "influx", "ping"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "curl -f -H 'Authorization: Token apiv3_arista_admin_token' http://localhost:8181/health || exit 1"]
+      interval: 2s
+      timeout: 5s
       retries: 3
-      start_period: 30s
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb3/data
+      - ./influxdb/admin-token.json:/admin-token.json:ro
     networks:
       - default
       - grafana
 
   telegraf:
+    restart: unless-stopped
     image: telegraf:latest
-    environment:
-      HOSTNAME: eos-telemetry
-    links:
-      - influxdb
-    volumes:
-      - ./telegraf:/etc/telegraf
     depends_on:
-      - influxdb
+      influxdb:
+        condition: service_healthy
+    environment:
+      - HOSTNAME=telegraf
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
     networks:
       - default
-      - devices
 
   grafana:
+    restart: unless-stopped
     image: grafana/grafana
+    depends_on:
+      influxdb:
+        condition: service_healthy
     ports:
       - 3000:3000
+    env_file:
+      - ./grafana/config.monitoring
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
-    env_file:
-      - ./grafana/config.monitoring
     networks:
       - grafana
 
 networks:
-  devices:
-    name: ceos-telemetry-devices
-    external: true
   grafana:
     name: grafana
     driver: bridge
