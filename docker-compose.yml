@@ -11,12 +11,12 @@ services:
     ports:
       - 8181:8181
     environment:
-      - INFLUXDB3_NODE_IDENTIFIER_PREFIX=node0
-      - LOG_FILTER=info
-      - INFLUXDB3_OBJECT_STORE=file
-      - INFLUXDB3_DB_DIR=/var/lib/influxdb3/data
-      - INFLUXDB3_ADMIN_TOKEN_FILE=/admin-token.json
-      - INFLUXDB3_QUERY_FILE_LIMIT=5000
+      LOG_FILTER: info
+      INFLUXDB3_NODE_IDENTIFIER_PREFIX: node0
+      INFLUXDB3_OBJECT_STORE: file
+      INFLUXDB3_DB_DIR: /var/lib/influxdb3/data
+      INFLUXDB3_ADMIN_TOKEN_FILE: /admin-token.json
+      INFLUXDB3_QUERY_FILE_LIMIT: 5000
     ulimits:
       nofile:
         soft: 26677
@@ -33,14 +33,23 @@ services:
       - default
       - grafana
 
+  explorer:
+    restart: unless-stopped
+    image: influxdata/influxdb3-ui:latest
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    ports:
+      - 8888:80
+    networks:
+      - default
+
   telegraf:
     restart: unless-stopped
     image: telegraf:latest
     depends_on:
       influxdb:
         condition: service_healthy
-    environment:
-      - HOSTNAME=telegraf
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
     networks:
@@ -48,7 +57,7 @@ services:
 
   grafana:
     restart: unless-stopped
-    image: grafana/grafana
+    image: grafana/grafana:latest
     depends_on:
       influxdb:
         condition: service_healthy

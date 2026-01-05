@@ -1,0 +1,1385 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "displayName": "${__field.labels.source}",
+          "mappings": [
+            {
+              "options": {
+                "0a:14:9f:ff:ff:00:00:00": {
+                  "color": "dark-green",
+                  "index": 0,
+                  "text": "Primary GM"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "pattern": ".*",
+                "result": {
+                  "color": "dark-red",
+                  "index": 1
+                }
+              },
+              "type": "regex"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 22,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH \n-- 1. Build the Grandmaster Clock Identity as a EUI-64 string\nformatted_data AS (\n  SELECT\n    time,\n    source,\n    concat(\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v0\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v1\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v2\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v3\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v4\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v5\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v6\"), 2, '0'), ':',\n        lpad(to_hex(\"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v7\"), 2, '0')\n    ) AS gm_id\n  FROM \"ptp\"\n  WHERE\n    source IN (${device:singlequote}) -- Only get the devices filtered by the dashboard\n    AND \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v0\" IS NOT NULL -- Check if the first octet is not null\n),\n-- The values at \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value\" only change if there is a GM change or if PTP Agent starts\n-- 2. We need to get the latest gm_id BEFORE the dashboard beginning\ninitial_state AS (\n  SELECT\n    -- TRICK : We force time to be the dashboard beginning\n    CAST($__timeFrom AS TIMESTAMP) as time, \n    source,\n    gm_id,\n    -- We order to only keep the most recent values of the past\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM formatted_data\n  WHERE time < $__timeFrom -- We look in the past (before the dashboard time range)\n),\n\n-- 3. We query the data in the dashboard time range\ncurrent_changes AS (\n  SELECT\n    time,\n    source,\n    gm_id\n  FROM formatted_data\n  WHERE time >= $__timeFrom AND time <= $__timeTo\n)\n\n-- 4. We combine both (UNION)\nSELECT time, source, gm_id \nFROM initial_state \nWHERE rn = 1 -- We only keep the latest value of the past\nUNION ALL\nSELECT time, source, gm_id \nFROM current_changes\nORDER BY time ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          }
+        }
+      ],
+      "title": "Grandmaster Clock Identity",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "source"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "transparent",
+            "mode": "fixed"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "applyToRow": false,
+              "mode": "gradient",
+              "type": "color-background"
+            },
+            "filterable": false,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 50,
+            "tooltip": {
+              "placement": "auto"
+            }
+          },
+          "mappings": [
+            {
+              "options": {
+                "0a:14:9f:ff:ff:00:00:00": {
+                  "color": "dark-green",
+                  "index": 0,
+                  "text": "Primary GM"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "pattern": "^([0-9a-fA-F]{2}:){7}[0-9a-fA-F]{2}$",
+                "result": {
+                  "color": "dark-red",
+                  "index": 1
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": ".*",
+                "result": {
+                  "color": "transparent",
+                  "index": 2
+                }
+              },
+              "type": "regex"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Device"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 265
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grandmaster Clock Identity"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 23,
+      "options": {
+        "cellHeight": "sm",
+        "enablePagination": false,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Device"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH all_history AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v0\" as v0,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v1\" as v1,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v2\" as v2,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v3\" as v3,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v4\" as v4,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v5\" as v5,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v6\" as v6,\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v7\" as v7,\n    -- rn=1 is the most recent datapoint received for this device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n    \"Sysdb/ptp/status/parentDS/grandmasterIdentity/value/v0\" IS NOT NULL\n    AND source IN (${device:singlequote})\n)\nSELECT\n  source as \"Device\",\n  concat(\n    lpad(to_hex(v0), 2, '0'), ':',\n    lpad(to_hex(v1), 2, '0'), ':',\n    lpad(to_hex(v2), 2, '0'), ':',\n    lpad(to_hex(v3), 2, '0'), ':',\n    lpad(to_hex(v4), 2, '0'), ':',\n    lpad(to_hex(v5), 2, '0'), ':',\n    lpad(to_hex(v6), 2, '0'), ':',\n    lpad(to_hex(v7), 2, '0')\n  ) AS \"Grandmaster Clock Identity\",\n  time as \"Last change\"\nFROM all_history\nWHERE rn = 1 -- We only take the latest value\nORDER BY source ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "\"Sysdb/ptp/status/currentDS/genId/id\"",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "name": "\"Sysdb/ptp/status/currentDS/gptpRateRatio\"",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          },
+          "table": "ptp"
+        }
+      ],
+      "title": "Grandmaster Clock Identity",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 6,
+      "panels": [],
+      "title": "PTP Statistics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": 3600000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 14
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\"\nFROM\n  ptp\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "alias": "\"ptp_offset\"",
+                "parameters": [
+                  {
+                    "name": "\"Sysdb/ptp/status/currentDS/offsetFromMaster\"",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "name": "time",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              },
+              {
+                "property": {
+                  "name": "source",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "orderBy": {
+              "property": {
+                "name": "time",
+                "type": "string"
+              },
+              "type": "property"
+            },
+            "orderByDirection": "DESC"
+          },
+          "table": "ptp"
+        }
+      ],
+      "title": "PTP Offset",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 15,
+        "y": 14
+      },
+      "id": 5,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 60,
+        "minVizHeight": 25,
+        "minVizWidth": 8,
+        "namePlacement": "top",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ordered_offsets AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/offsetFromMaster\" AS offset_from_master,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  offset_from_master AS last_offset_from_master\nFROM ordered_offsets\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY source ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          }
+        }
+      ],
+      "title": "PTP Offset",
+      "type": "bargauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 14
+      },
+      "id": 4,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# PTP Offset\n\nThis is the difference between the time reported by the slave clock and the time reported by the master clock that it is attempting to synchronize with.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.3.1",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": 3600000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 22
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/meanPathDelay\"\nFROM \"ptp\"\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/meanPathDelay\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "alias": "\"ptp_offset\"",
+                "parameters": [
+                  {
+                    "name": "\"Sysdb/ptp/status/currentDS/offsetFromMaster\"",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "name": "time",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              },
+              {
+                "property": {
+                  "name": "source",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "orderBy": {
+              "property": {
+                "name": "time",
+                "type": "string"
+              },
+              "type": "property"
+            },
+            "orderByDirection": "DESC"
+          },
+          "table": "ptp"
+        }
+      ],
+      "title": "PTP Delay",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 15,
+        "y": 22
+      },
+      "id": 15,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 60,
+        "minVizHeight": 25,
+        "minVizWidth": 8,
+        "namePlacement": "top",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ordered_delays AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/meanPathDelay\" AS mean_path_delay,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/meanPathDelay\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  mean_path_delay AS last_mean_path_delay\nFROM ordered_delays\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY source ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          }
+        }
+      ],
+      "title": "PTP Delays",
+      "type": "bargauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 22
+      },
+      "id": 7,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# PTP Delay\n\n This is the time it has taken for a synchronization message to travel from the master clock. It is used by the slave clock to adjust its own time so that it can more accurately synchronize with the master.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.3.1",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": 3600000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 30
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  source,\n  -- We calculate jitter as the standard deviation of the offset \n  STDDEV(\"Sysdb/ptp/status/currentDS/offsetFromMaster\") OVER (\n    PARTITION BY source\n    ORDER BY time ASC\n    ROWS BETWEEN 59 PRECEDING AND CURRENT ROW\n  ) AS \"Rolling Jitter (1min)\"\nFROM \"ptp\"\nWHERE\n  time >= $__timeFrom AND time <= $__timeTo\n  AND \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "alias": "\"ptp_offset\"",
+                "parameters": [
+                  {
+                    "name": "\"Sysdb/ptp/status/currentDS/offsetFromMaster\"",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "name": "time",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              },
+              {
+                "property": {
+                  "name": "source",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "orderBy": {
+              "property": {
+                "name": "time",
+                "type": "string"
+              },
+              "type": "property"
+            },
+            "orderByDirection": "DESC"
+          },
+          "table": "ptp"
+        }
+      ],
+      "title": "PTP Jitter",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 15,
+        "y": 30
+      },
+      "id": 16,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 60,
+        "minVizHeight": 25,
+        "minVizWidth": 8,
+        "namePlacement": "top",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH rolling_jitters AS (\n  SELECT\n    source,\n    time,\n    -- 1. Calcul de l'écart type sur les 60 dernières valeurs (fenêtre glissante)\n    STDDEV(\"Sysdb/ptp/status/currentDS/offsetFromMaster\") OVER (\n      PARTITION BY source\n      ORDER BY time ASC\n      ROWS BETWEEN 59 PRECEDING AND CURRENT ROW\n    ) AS last_jitter,\n    -- 2. On numérote les lignes pour identifier la plus récente (rn=1)\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n    -- Optimisation : We only load the latest 15 minutes to calculate latest jitter\n    time >= now() - INTERVAL '15 minutes'\n    AND \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n    AND source IN (${device:singlequote})\n)\nSELECT\n  source,\n  last_jitter AS \"Latest Jitter (1min)\"\nFROM rolling_jitters\nWHERE\n  rn = 1 -- On ne garde que la dernière seconde connue\nORDER BY source ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          }
+        }
+      ],
+      "title": "PTP Jitter",
+      "type": "bargauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 30
+      },
+      "id": 8,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# PTP Jitter\n\n This indicates the variation in the delay between the arrival of consecutive synchronization messages from the master clock.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.3.1",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": 3600000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 38
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/skew\"\nFROM \"ptp\"\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/skew\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "alias": "\"ptp_offset\"",
+                "parameters": [
+                  {
+                    "name": "\"Sysdb/ptp/status/currentDS/offsetFromMaster\"",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "name": "time",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              },
+              {
+                "property": {
+                  "name": "source",
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "orderBy": {
+              "property": {
+                "name": "time",
+                "type": "string"
+              },
+              "type": "property"
+            },
+            "orderByDirection": "DESC"
+          },
+          "table": "ptp"
+        }
+      ],
+      "title": "PTP Skew",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 5,
+          "displayName": "${__field.labels.source}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 15,
+        "y": 38
+      },
+      "id": 20,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 60,
+        "minVizHeight": 25,
+        "minVizWidth": 8,
+        "namePlacement": "top",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ordered_skews AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/skew\" AS skew,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/skew\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  skew AS last_skew\nFROM ordered_skews\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY source ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          }
+        }
+      ],
+      "title": "PTP Skew",
+      "type": "bargauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 38
+      },
+      "id": 21,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# PTP Skew\n\nThis is an estimation of the master clock seconds to the local clock seconds.\nThis is done in software since we lack of synchronization hardware to syntonize.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.3.1",
+      "title": "",
+      "type": "text"
+    }
+  ],
+  "preload": false,
+  "refresh": "auto",
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "PF14EF51A41728637"
+        },
+        "definition": "SELECT DISTINCT(\"source\") FROM \"ptp\"",
+        "description": "",
+        "includeAll": true,
+        "label": "Device",
+        "multi": true,
+        "name": "device",
+        "options": [],
+        "query": {
+          "query": "SELECT DISTINCT(\"source\") FROM \"ptp\"",
+          "refId": "InfluxVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 5,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Arista EOS - Precision Time Protocol (PTP)",
+  "uid": "adhtrrm",
+  "version": 2
+}
