@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 0,
+  "id": 5,
   "links": [],
   "panels": [
     {
@@ -47,7 +47,7 @@
           "mappings": [
             {
               "options": {
-                "0a:14:9f:ff:ff:00:00:00": {
+                "00:1c:73:ff:ff:01:00:01": {
                   "color": "dark-green",
                   "index": 0,
                   "text": "Primary GM"
@@ -180,7 +180,7 @@
           "mappings": [
             {
               "options": {
-                "0a:14:9f:ff:ff:00:00:00": {
+                "00:1c:73:ff:ff:01:00:01": {
                   "color": "dark-green",
                   "index": 0,
                   "text": "Primary GM"
@@ -228,7 +228,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 265
+                "value": 245
               }
             ]
           },
@@ -240,7 +240,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 201
               }
             ]
           }
@@ -409,7 +409,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\"\nFROM\n  ptp\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\"\nFROM\n  ptp\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n  AND \n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\" != 0 -- A perfect (0) offset usually mean the device is not PTP locked\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -465,7 +465,7 @@
         "defaults": {
           "color": {
             "fixedColor": "blue",
-            "mode": "fixed"
+            "mode": "thresholds"
           },
           "decimals": 0,
           "displayName": "${__field.labels.source}",
@@ -476,6 +476,14 @@
               {
                 "color": "green",
                 "value": 0
+              },
+              {
+                "color": "semi-dark-yellow",
+                "value": 150
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 250
               }
             ]
           },
@@ -525,7 +533,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ordered_offsets AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/offsetFromMaster\" AS offset_from_master,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  offset_from_master AS last_offset_from_master\nFROM ordered_offsets\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY source ASC;",
+          "rawSql": "WITH ordered_offsets AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/offsetFromMaster\" AS offset_from_master,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n      AND \n      \"Sysdb/ptp/status/currentDS/offsetFromMaster\" != 0 -- A perfect (0) offset usually mean the device is not PTP locked\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  ABS(offset_from_master) AS last_offset_from_master -- We are using the absolute value only here to have nice sorted gauges\nFROM ordered_offsets\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY ABS(offset_from_master) DESC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -664,7 +672,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/meanPathDelay\"\nFROM \"ptp\"\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/meanPathDelay\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "rawSql": "SELECT\n  time,\n  source,\n  \"Sysdb/ptp/status/currentDS/meanPathDelay\"\nFROM \"ptp\"\nWHERE\n  \"time\" >= $__timeFrom AND \"time\" <= $__timeTo\n  AND\n  \"Sysdb/ptp/status/currentDS/meanPathDelay\" IS NOT NULL\n  AND \n  \"Sysdb/ptp/status/currentDS/meanPathDelay\" != 0 -- A perfect (0) path delay usually mean the device is not PTP locked\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -720,7 +728,7 @@
         "defaults": {
           "color": {
             "fixedColor": "blue",
-            "mode": "fixed"
+            "mode": "thresholds"
           },
           "decimals": 0,
           "displayName": "${__field.labels.source}",
@@ -731,6 +739,14 @@
               {
                 "color": "green",
                 "value": 0
+              },
+              {
+                "color": "semi-dark-yellow",
+                "value": 1000
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 1500
               }
             ]
           },
@@ -780,7 +796,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ordered_delays AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/meanPathDelay\" AS mean_path_delay,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/meanPathDelay\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  mean_path_delay AS last_mean_path_delay\nFROM ordered_delays\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY source ASC;",
+          "rawSql": "WITH ordered_delays AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/meanPathDelay\" AS mean_path_delay,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/meanPathDelay\" IS NOT NULL\n      AND \n      \"Sysdb/ptp/status/currentDS/meanPathDelay\" != 0 -- A perfect (0) path delay usually mean the device is not PTP locked\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  mean_path_delay AS last_mean_path_delay\nFROM ordered_delays\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY mean_path_delay DESC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -919,7 +935,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  time,\n  source,\n  -- We calculate jitter as the standard deviation of the offset \n  STDDEV(\"Sysdb/ptp/status/currentDS/offsetFromMaster\") OVER (\n    PARTITION BY source\n    ORDER BY time ASC\n    ROWS BETWEEN 59 PRECEDING AND CURRENT ROW\n  ) AS \"Rolling Jitter (1min)\"\nFROM \"ptp\"\nWHERE\n  time >= $__timeFrom AND time <= $__timeTo\n  AND \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
+          "rawSql": "SELECT\n  time,\n  source,\n  -- We calculate jitter as the standard deviation of the offset \n  STDDEV(\"Sysdb/ptp/status/currentDS/offsetFromMaster\") OVER (\n    PARTITION BY source\n    ORDER BY time ASC\n    ROWS BETWEEN 59 PRECEDING AND CURRENT ROW\n  ) AS \"Rolling Jitter (1min)\"\nFROM \"ptp\"\nWHERE\n  time >= $__timeFrom AND time <= $__timeTo\n  AND \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n  AND \n  \"Sysdb/ptp/status/currentDS/offsetFromMaster\" != 0 -- A perfect (0) offset usually mean the device is not PTP locked\n  AND source IN (${device:singlequote})\nORDER BY time ASC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1035,7 +1051,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH rolling_jitters AS (\n  SELECT\n    source,\n    time,\n    -- 1. Calcul de l'écart type sur les 60 dernières valeurs (fenêtre glissante)\n    STDDEV(\"Sysdb/ptp/status/currentDS/offsetFromMaster\") OVER (\n      PARTITION BY source\n      ORDER BY time ASC\n      ROWS BETWEEN 59 PRECEDING AND CURRENT ROW\n    ) AS last_jitter,\n    -- 2. On numérote les lignes pour identifier la plus récente (rn=1)\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n    -- Optimisation : We only load the latest 15 minutes to calculate latest jitter\n    time >= now() - INTERVAL '15 minutes'\n    AND \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n    AND source IN (${device:singlequote})\n)\nSELECT\n  source,\n  last_jitter AS \"Latest Jitter (1min)\"\nFROM rolling_jitters\nWHERE\n  rn = 1 -- On ne garde que la dernière seconde connue\nORDER BY source ASC;",
+          "rawSql": "WITH rolling_jitters AS (\n  SELECT\n    source,\n    time,\n    -- 1. Calcul de l'écart type sur les 60 dernières valeurs (fenêtre glissante)\n    STDDEV(\"Sysdb/ptp/status/currentDS/offsetFromMaster\") OVER (\n      PARTITION BY source\n      ORDER BY time ASC\n      ROWS BETWEEN 59 PRECEDING AND CURRENT ROW\n    ) AS last_jitter,\n    -- 2. On numérote les lignes pour identifier la plus récente (rn=1)\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n    -- Optimisation : We only load the latest 15 minutes to calculate latest jitter\n    time >= now() - INTERVAL '15 minutes'\n    AND \"Sysdb/ptp/status/currentDS/offsetFromMaster\" IS NOT NULL\n    AND \n    \"Sysdb/ptp/status/currentDS/offsetFromMaster\" != 0 -- A perfect (0) offset usually mean the device is not PTP locked\n    AND source IN (${device:singlequote})\n)\nSELECT\n  source,\n  last_jitter AS \"Latest Jitter (1min)\"\nFROM rolling_jitters\nWHERE\n  rn = 1 -- On ne garde que la dernière seconde connue\nORDER BY last_jitter DESC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1076,7 +1092,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# PTP Jitter\n\n This indicates the variation in the delay between the arrival of consecutive synchronization messages from the master clock.",
+        "content": "# PTP Jitter\n\n This indicates the variation in the delay between the arrival of consecutive synchronization messages from the master clock. This is calculated using the standard deviation of the PTP offset. A high PTP jitter indicates a high variance in the PTP packets forwarding leading to PTP slaves to calculate a wrong PTP offset.",
         "mode": "markdown"
       },
       "pluginVersion": "12.3.1",
@@ -1229,7 +1245,7 @@
         "defaults": {
           "color": {
             "fixedColor": "blue",
-            "mode": "fixed"
+            "mode": "thresholds"
           },
           "decimals": 5,
           "displayName": "${__field.labels.source}",
@@ -1240,6 +1256,18 @@
               {
                 "color": "green",
                 "value": 0
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 0
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 0.999
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 1.001
               }
             ]
           }
@@ -1288,7 +1316,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ordered_skews AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/skew\" AS skew,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/skew\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  skew AS last_skew\nFROM ordered_skews\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY source ASC;",
+          "rawSql": "WITH ordered_skews AS (\n  SELECT\n    time,\n    source,\n    \"Sysdb/ptp/status/currentDS/skew\" AS skew,\n    -- We order the data by decreasing time for each device\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"ptp\"\n  WHERE\n      time >= $__timeFrom AND time <= $__timeTo\n      AND\n      \"Sysdb/ptp/status/currentDS/skew\" IS NOT NULL\n      AND source IN (${device:singlequote})\n)\nSELECT\n  time,\n  source,\n  skew AS last_skew\nFROM ordered_skews\n-- We only keep the latest value (most recent)\nWHERE rn = 1\nORDER BY skew DESC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1329,7 +1357,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# PTP Skew\n\nThis is an estimation of the master clock seconds to the local clock seconds.\nThis is done in software since we lack of synchronization hardware to syntonize.",
+        "content": "# PTP Skew\n\nThis is an estimation of the master clock seconds to the local clock seconds.\nThis is done in software since we lack of synchronization hardware to syntonize. **This value must be close to 1.0.**",
         "mode": "markdown"
       },
       "pluginVersion": "12.3.1",
@@ -1374,12 +1402,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Arista EOS - Precision Time Protocol (PTP)",
   "uid": "adhtrrm",
-  "version": 2
+  "version": 4
 }
