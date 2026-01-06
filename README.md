@@ -1,9 +1,10 @@
 # Arista Streaming Telemetry using InfluxDB and Grafana
 ### Device Dashboard
-![device](images/device.png)
+![device](images/device_1.png)
+![device](images/device_2.png)
 ### PTP Dashboard
-![ptp_1](images/ptp_1.png)
-![ptp_2](images/ptp_2.png)
+![ptp](images/ptp_1.png)
+![ptp](images/ptp_2.png)
 
 ### Instructions
 

@@ -16,7 +16,8 @@ services:
       INFLUXDB3_OBJECT_STORE: file
       INFLUXDB3_DB_DIR: /var/lib/influxdb3/data
       INFLUXDB3_ADMIN_TOKEN_FILE: /admin-token.json
-      INFLUXDB3_QUERY_FILE_LIMIT: 5000
+      INFLUXDB3_QUERY_FILE_LIMIT: 1000
+      INFLUXDB3_EXEC_MEM_POOL_BYTES: 40%
     ulimits:
       nofile:
         soft: 26677

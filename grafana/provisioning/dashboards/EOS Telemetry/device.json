@@ -24,38 +24,39 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 0,
   "links": [],
   "panels": [
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "P483D683DA2DCC7C7"
+        "uid": "PF14EF51A41728637"
       },
       "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "green",
+            "mode": "shades"
           },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "CPU Utilization",
+            "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "hue",
+            "fillOpacity": 0,
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepAfter",
+            "lineInterpolation": "smooth",
             "lineStyle": {
               "fill": "solid"
             },
@@ -64,20 +65,23 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "always",
+            "showPoints": "never",
             "showValues": false,
-            "spanNulls": 3600000,
+            "spanNulls": false,
             "stacking": {
               "group": "A",
               "mode": "none"
             },
             "thresholdsStyle": {
-              "mode": "off"
+              "mode": "line"
             }
           },
-          "displayName": "${__field.name}",
+          "decimals": 0,
+          "displayName": "${__field.labels.metric_name}",
           "links": [],
           "mappings": [],
+          "max": 100,
+          "min": -3,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -86,18 +90,42 @@
                 "value": 0
               },
               {
-                "color": "red",
+                "color": "#EAB839",
                 "value": 80
+              },
+              {
+                "color": "red",
+                "value": 90
               }
             ]
           },
           "unit": "percent"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*Global.*/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 5
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 9,
+        "w": 19,
         "x": 0,
         "y": 0
       },
@@ -105,25 +133,29 @@
       "options": {
         "legend": {
           "calcs": [
-            "max"
+            "max",
+            "last"
           ],
-          "displayMode": "list",
-          "placement": "bottom",
+          "displayMode": "table",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
+          "dataset": "iox",
           "datasource": {
             "type": "influxdb",
-            "uid": "P483D683DA2DCC7C7"
+            "uid": "PF14EF51A41728637"
           },
+          "editorMode": "code",
+          "format": "table",
           "groupBy": [
             {
               "params": [
@@ -147,6 +179,8 @@
           "measurement": "cpu",
           "orderByTime": "ASC",
           "policy": "default",
+          "rawQuery": true,
+          "rawSql": "WITH dataset AS (\n  SELECT\n    time,\n    source,\n    \"index\",\n    \"system/cpus/cpu/state/total/avg\" as val\n  FROM \"system\"\n  WHERE\n    time >= $__timeFrom AND time <= $__timeTo\n    AND source IN (${device:singlequote})\n    AND \"system/cpus/cpu/state/total/avg\" IS NOT NULL\n)\n\n-- Partie 1 : Les Coeurs Individuels\nSELECT\n  DATE_BIN(INTERVAL '30 seconds', time) as time,\n  concat('Core ', \"index\") as metric_name,\n  AVG(val) as usage_pct\nFROM dataset\nGROUP BY 1, 2\n\nUNION ALL\n\n-- Partie 2 : La Moyenne Globale (Global)\nSELECT\n  DATE_BIN(INTERVAL '30 seconds', time) as time,\n  'Global CPU' as metric_name, -- Nom distinct\n  AVG(val) as usage_pct\nFROM dataset\nGROUP BY 1, 2\n\nORDER BY time ASC;",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -163,6 +197,28 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "\"Kernel/proc/cpu/utilization/cpu/0/util\"",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          },
+          "table": "cpu",
           "tags": [
             {
               "key": "source::tag",
@@ -173,12 +229,23 @@
         }
       ],
       "title": "CPU Utilization",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "metric_name"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "P483D683DA2DCC7C7"
+        "uid": "PF14EF51A41728637"
       },
       "description": "",
       "fieldConfig": {
@@ -213,8 +280,8 @@
       "gridPos": {
         "h": 8,
         "w": 5,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 9
       },
       "id": 15,
       "options": {
@@ -222,10 +289,8 @@
         "minVizWidth": 200,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "/^Used Memory$/",
+          "calcs": [],
+          "fields": "",
           "values": false
         },
         "showThresholdLabels": true,
@@ -233,13 +298,16 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "12.2.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
+          "dataset": "iox",
           "datasource": {
             "type": "influxdb",
-            "uid": "P483D683DA2DCC7C7"
+            "uid": "PF14EF51A41728637"
           },
+          "editorMode": "code",
+          "format": "table",
           "groupBy": [
             {
               "params": [
@@ -257,6 +325,8 @@
           "measurement": "memory",
           "orderByTime": "ASC",
           "policy": "default",
+          "rawQuery": true,
+          "rawSql": "WITH \n-- 1. Capacité TOTALE (Historique complet)\ncapacity AS (\n  SELECT\n    source,\n    \"system/memory/state/physical\" as total_bytes,\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"system\"\n  WHERE source IN (${device:singlequote}) AND \"system/memory/state/physical\" IS NOT NULL\n),\n\n-- 2. Utilisation ACTUELLE (Fenêtre actuelle)\nusage AS (\n  SELECT\n    source,\n    \"system/memory/state/used\" as used_bytes,\n    ROW_NUMBER() OVER (PARTITION BY source ORDER BY time DESC) as rn\n  FROM \"system\"\n  WHERE time >= $__timeFrom AND source IN (${device:singlequote}) AND \"system/memory/state/used\" IS NOT NULL\n)\n\n-- 3. On sort les deux valeurs : Utilisé (pour l'affichage) et Total (pour le Max de la jauge)\nSELECT\n  usage.source,\n  usage.used_bytes,\n  capacity.total_bytes\nFROM usage\nLEFT JOIN capacity ON usage.source = capacity.source\nWHERE usage.rn = 1 AND (capacity.rn = 1 OR capacity.rn IS NULL)\nORDER BY usage.source ASC;",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -273,6 +343,22 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          },
           "tags": [
             {
               "key": "source::tag",
@@ -283,18 +369,131 @@
         }
       ],
       "title": "Memory Utilization",
+      "transformations": [
+        {
+          "id": "configFromData",
+          "options": {
+            "applyTo": {
+              "id": "byName",
+              "options": "used_bytes"
+            },
+            "configRefId": "A",
+            "mappings": [
+              {
+                "fieldName": "total_bytes",
+                "handlerKey": "max"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "total_bytes": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "P483D683DA2DCC7C7"
+        "uid": "PF14EF51A41728637"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 11,
+        "x": 5,
+        "y": 9
+      },
+      "id": 17,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "CPU %"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "PF14EF51A41728637"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH \n-- 1. DONNÉES CHAUDES (Métriques récentes)\n-- On regarde une fenêtre très courte (2 min) pour la performance\nlive_metrics AS (\n  SELECT\n    source,\n    \"pid\",\n    -- On utilise MAX ou LAST_VALUE pour attraper la donnée si elle existe dans la fenêtre\n    MAX(\"system/processes/process/state/cpu_utilization\") as cpu,\n    MAX(\"system/processes/process/state/memory_usage\") as mem\n  FROM \"system\"\n  WHERE\n    time >= NOW() - INTERVAL '2 minutes'\n    AND source IN (${device:singlequote})\n    AND \"pid\" IS NOT NULL\n  GROUP BY source, \"pid\"\n),\n\n-- 2. DONNÉES FROIDES (Noms statiques)\n-- On regarde loin dans le passé pour trouver le nom\nnames AS (\n  SELECT\n    source,\n    \"pid\",\n    \"system/processes/process/state/name\" as proc_name,\n    -- On prend le nom le plus récent trouvé dans l'historique\n    ROW_NUMBER() OVER (PARTITION BY source, \"pid\" ORDER BY time DESC) as rn\n  FROM \"system\"\n  WHERE\n    -- Ajustez ici : 24 heures, 7 jours... selon la fréquence d'envoi de vos noms\n    time >= NOW() - INTERVAL '24 hours'\n    AND source IN (${device:singlequote})\n    AND \"system/processes/process/state/name\" IS NOT NULL\n)\n\n-- 3. JOINTURE\nSELECT\n  live.\"pid\" AS \"PID\",\n  -- Si on ne trouve pas de nom, on affiche le PID ou \"Unknown\"\n  COALESCE(n.proc_name, CAST(live.\"pid\" AS VARCHAR)) AS \"Name\",\n  live.cpu AS \"CPU %\",\n  live.mem AS \"Memory\"\nFROM live_metrics live\nLEFT JOIN names n \n  ON live.source = n.source \n  AND live.\"pid\" = n.\"pid\" \n  AND n.rn = 1 -- On ne joint que sur le dernier nom connu\nWHERE\n  -- Nettoyage des processus inactifs\n  (live.cpu > 0 OR live.mem > 1000000)\nORDER BY \n  live.cpu DESC\nLIMIT 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          }
+        }
+      ],
+      "title": "Processes",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "PF14EF51A41728637"
       },
       "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -313,7 +512,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepBefore",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -321,7 +520,7 @@
             },
             "showPoints": "never",
             "showValues": false,
-            "spanNulls": 3600000,
+            "spanNulls": false,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -330,6 +529,8 @@
               "mode": "off"
             }
           },
+          "displayName": "${__field.labels.name}",
+          "fieldMinMax": false,
           "links": [],
           "mappings": [],
           "thresholds": {
@@ -338,10 +539,6 @@
               {
                 "color": "green",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -350,10 +547,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 19,
-        "w": 17,
+        "h": 9,
+        "w": 22,
         "x": 0,
-        "y": 8
+        "y": 17
       },
       "id": 16,
       "interval": "10s",
@@ -362,7 +559,7 @@
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
           "hideZeros": false,
@@ -370,14 +567,17 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "alias": "$tag_name",
+          "dataset": "iox",
           "datasource": {
             "type": "influxdb",
-            "uid": "P483D683DA2DCC7C7"
+            "uid": "PF14EF51A41728637"
           },
+          "editorMode": "code",
+          "format": "table",
           "groupBy": [
             {
               "params": [
@@ -407,6 +607,8 @@
           "measurement": "interfaces-counters",
           "orderByTime": "ASC",
           "policy": "default",
+          "rawQuery": true,
+          "rawSql": "WITH raw_data AS (\n  SELECT\n    time,\n    source,\n    name,\n    -- On récupère la valeur actuelle\n    \"interfaces/interface/state/counters/in_octets\" as in_bytes,\n    \"interfaces/interface/state/counters/out_octets\" as out_bytes,\n    \n    -- On récupère la valeur PRÉCÉDENTE (LAG) pour la même interface\n    LAG(\"interfaces/interface/state/counters/in_octets\") OVER (PARTITION BY source, name ORDER BY time) as prev_in,\n    LAG(\"interfaces/interface/state/counters/out_octets\") OVER (PARTITION BY source, name ORDER BY time) as prev_out,\n    \n    -- On récupère le temps PRÉCÉDENT pour savoir combien de secondes se sont écoulées\n    LAG(time) OVER (PARTITION BY source, name ORDER BY time) as prev_time\n  FROM \"interfaces\"\n  WHERE\n    time >= $__timeFrom AND time <= $__timeTo\n    AND source IN (${device:singlequote})\n    AND name IN (${interface:singlequote})\n    AND \"interfaces/interface/state/counters/in_octets\" IS NOT NULL\n)\n\nSELECT\n  time,\n  name,\n  \n  -- Calcul INBOUND (Bits per second)\n  -- Formule : (Différence Octets * 8) / Différence Secondes\n  CASE \n    WHEN in_bytes >= prev_in THEN \n      (in_bytes - prev_in) * 8.0 / (EXTRACT(EPOCH FROM (time - prev_time)))\n    ELSE NULL -- Cas du reboot (compteur remis à zéro)\n  END AS \"Inbound bps\",\n\n  -- Calcul OUTBOUND (Bits per second) - EN NÉGATIF pour l'effet miroir\n  CASE \n    WHEN out_bytes >= prev_out THEN \n      -1 * ((out_bytes - prev_out) * 8.0 / (EXTRACT(EPOCH FROM (time - prev_time))))\n    ELSE NULL\n  END AS \"Outbound bps\"\n\nFROM raw_data\nWHERE prev_time IS NOT NULL -- On enlève la toute première ligne qui n'a pas de précédent\nORDER BY time ASC;",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -435,6 +637,22 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          },
           "tags": [
             {
               "key": "source::tag",
@@ -451,283 +669,14 @@
         }
       ],
       "title": "Bitrate In/Out of ${interface}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "P483D683DA2DCC7C7"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 4,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 27
-      },
-      "id": 14,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.2.0",
-      "targets": [
-        {
-          "alias": "Total",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P483D683DA2DCC7C7"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "hide": true,
-          "measurement": "memory",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "query": "SELECT last(\"Kernel/proc/meminfo/memTotal\") FROM \"memory\" WHERE  (\"source\"=~ /^$device$/)",
-          "rawQuery": true,
-          "refId": "Total",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "Kernel/proc/meminfo/memTotal"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "source::tag",
-              "operator": "=~",
-              "value": "/^$device$/"
-            }
-          ]
-        },
-        {
-          "alias": "Free",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P483D683DA2DCC7C7"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "previous"
-              ],
-              "type": "fill"
-            }
-          ],
-          "hide": false,
-          "measurement": "memory",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "query": "SELECT last(\"Kernel/proc/meminfo/memFree\") FROM \"memory\" WHERE (\"source\"::tag =~ /^$device$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
-          "rawQuery": false,
-          "refId": "Free",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "Kernel/proc/meminfo/memFree"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "source::tag",
-              "operator": "=~",
-              "value": "/^$device$/"
-            }
-          ]
-        },
-        {
-          "alias": "Buffers",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P483D683DA2DCC7C7"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "none"
-              ],
-              "type": "fill"
-            }
-          ],
-          "hide": false,
-          "measurement": "memory",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "B",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "Kernel/proc/meminfo/buffers"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "source::tag",
-              "operator": "=~",
-              "value": "/^$device$/"
-            }
-          ]
-        },
-        {
-          "datasource": {
-            "name": "Expression",
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "downsampler": "max",
-          "expression": "Total",
-          "hide": false,
-          "refId": "Resample",
-          "type": "resample",
-          "upsampler": "pad",
-          "window": "50ms"
-        }
-      ],
-      "title": "Memory Allocation",
       "transformations": [
         {
-          "id": "calculateField",
+          "id": "partitionByValues",
           "options": {
-            "alias": "Used",
-            "binary": {
-              "left": {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Resample {__name__=\"Total\"}"
-                }
-              },
-              "operator": "-",
-              "right": {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Free"
-                }
-              }
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            },
-            "replaceFields": false
+            "fields": [
+              "name"
+            ],
+            "keepFields": false
           }
         }
       ],
@@ -745,8 +694,8 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "ld365",
-          "value": "ld365"
+          "text": "clab-ptp-SPINE1",
+          "value": "clab-ptp-SPINE1"
         },
         "datasource": {
           "type": "influxdb",
@@ -764,8 +713,10 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "Ethernet10/1",
-          "value": "Ethernet10/1"
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "influxdb",
@@ -783,11 +734,35 @@
         "refresh": 2,
         "regex": "",
         "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "PF14EF51A41728637"
+        },
+        "definition": "SELECT column_name\nFROM information_schema.columns\nWHERE table_name = 'cpu'\n  AND column_name LIKE '%cpu/utilization/%/util'\nORDER BY column_name ASC",
+        "hide": 2,
+        "includeAll": true,
+        "multi": true,
+        "name": "cpu_columns",
+        "options": [],
+        "query": {
+          "query": "SELECT column_name\nFROM information_schema.columns\nWHERE table_name = 'cpu'\n  AND column_name LIKE '%cpu/utilization/%/util'\nORDER BY column_name ASC",
+          "refId": "InfluxVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "Kernel\\/proc\\/cpu\\/utilization\\/cpu\\/\\d+\\/util",
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {
@@ -804,7 +779,7 @@
     ]
   },
   "timezone": "",
-  "title": "Device Health",
-  "uid": "ky1bhqdMz",
-  "version": 2
+  "title": "Arista EOS - Device",
+  "uid": "ky1bhqdMa",
+  "version": 13
 }
